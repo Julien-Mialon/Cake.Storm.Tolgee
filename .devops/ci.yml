@@ -74,7 +74,7 @@ stages:
             command: push
             packagesToPush: '$(Pipeline.Workspace)/drop/*.nupkg;!$(Pipeline.Workspace)/drop/*.symbols.nupkg'
             nuGetFeedType: external
-            publishFeedCredentials: $(BagetFeedCredentials)
+            publishFeedCredentials: nuget.internal
 
 - stage: deploy_nuget
   displayName: 'Deploy to NuGet'
@@ -101,4 +101,4 @@ stages:
                   command: push
                   packagesToPush: '$(Pipeline.Workspace)/drop/*.nupkg;$(Pipeline.Workspace)/drop/*.snupkg'
                   nuGetFeedType: external
-                  publishFeedCredentials: $(NuGetFeedCredentials)
+                  publishFeedCredentials: nuget.org
