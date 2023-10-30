@@ -105,6 +105,7 @@ internal class TaskMaker
 		if (_configuration.Output.Type is OutputType.Typescript)
 		{
 			await new TypescriptOutputTask(_context.CakeContext.Log, _configuration.Output.Languages, _configuration.DefaultLanguage).Run();
+			return;
 		}
 
 		throw new InvalidOperationException("Output type not supported");

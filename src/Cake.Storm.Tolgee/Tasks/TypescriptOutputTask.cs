@@ -72,7 +72,7 @@ internal class TypescriptOutputTask : BaseTask
 			lines.Add("");
 
 			string result = string.Join(nl, lines);
-			await File.WriteAllTextAsync($"../{languageConfiguration.LanguageCode}.ts", result);
+			await File.WriteAllTextAsync(languageConfiguration.OutputFile, result);
 		}
 	}
 
