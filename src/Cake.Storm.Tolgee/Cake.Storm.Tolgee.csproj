@@ -15,8 +15,8 @@
 		<Company>Julien Mialon</Company>
 		<Description>A set of aliases for Cake to interact with tolgee translation platform.</Description>
 		<Copyright>Copyright 2023</Copyright>
-		<PackageProjectUrl>https://github.com/magicbotfr/magicbot-tolgee</PackageProjectUrl>
-		<RepositoryUrl>https://github.com/magicbotfr/magicbot-tolgee</RepositoryUrl>
+		<PackageProjectUrl>https://github.com/Julien-Mialon/Cake.Storm.Tolgee</PackageProjectUrl>
+		<RepositoryUrl>https://github.com/Julien-Mialon/Cake.Storm.Tolgee</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
@@ -35,6 +35,14 @@
 		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
 		<AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
 	</PropertyGroup>
+	
+	<!-- scripts embedding -->
+	<ItemGroup>
+		<Content Include="scripts/*.cake">
+			<Pack>true</Pack>
+			<PackagePath>scripts</PackagePath>
+		</Content>
+	</ItemGroup>
 
   <ItemGroup>
 		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="All" />

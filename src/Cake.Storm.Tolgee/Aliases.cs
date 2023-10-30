@@ -19,7 +19,7 @@ public delegate void TaskTeardownDelegate(Action<ITaskTeardownContext> action);
 public static class Aliases
 {
 	[CakeMethodAlias]
-	public static ConfigurationBuilder CreateConfigurationBuilder(this ICakeContext context, TaskDelegate task, SetupDelegate setup, TeardownDelegate teardown, TaskSetupDelegate taskSetup, TaskTeardownDelegate taskTeardown)
+	public static ConfigurationBuilder TolgeeConfigurationBuilder(this ICakeContext context, TaskDelegate task, SetupDelegate setup, TeardownDelegate teardown, TaskSetupDelegate taskSetup, TaskTeardownDelegate taskTeardown)
 	{
 		IFluentContext fluentContext = new FluentContext(context, task, setup, teardown, taskSetup, taskTeardown);
 		return new ConfigurationBuilder(fluentContext);
