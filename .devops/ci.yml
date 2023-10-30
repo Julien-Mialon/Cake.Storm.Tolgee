@@ -1,5 +1,5 @@
 variables:
-  PackageVersion: '1.0.0'
+  PackageVersion: '1.0.1'
 
 resources:
   repositories:

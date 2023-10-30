@@ -2,5 +2,5 @@
 
 public ConfigurationBuilder ConfigureTolgee()
 {
-    return TolgeeConfigurationBuilder(Task, Setup, Teardown, TaskSetup, TaskTeardown);
+    return TolgeeConfigurationBuilder(Task);
 }

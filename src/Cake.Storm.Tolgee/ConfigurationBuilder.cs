@@ -1,131 +1,104 @@
 using Cake.Core;
-using Cake.Core.Diagnostics;
-using Cake.Storm.Tolgee.Tasks;
+using Cake.Storm.Tolgee.Configurations;
 
 namespace Cake.Storm.Tolgee;
 
-public class ConfigurationBuilder
+public class ConfigurationBuilder : IInputConfigurationBuilder, IOutputConfigurationBuilder
 {
-	private readonly IFluentContext _context;
-	private readonly List<string> _languages = new();
-	private string? _defaultLanguage;
-	private string? _host;
-	private string? _apiKey;
+	private readonly FluentContext _context;
+	private readonly Configuration _configuration = new();
 
-	public ConfigurationBuilder(IFluentContext context)
+	public ConfigurationBuilder(FluentContext context)
 	{
 		_context = context;
 	}
 
-	public ConfigurationBuilder UseHost(string host)
+	public ConfigurationBuilder UseTolgee(string host, string apiKey)
 	{
-		_host = host;
+		_configuration.Tolgee.Host = host;
+		_configuration.Tolgee.ApiKey = apiKey;
 		return this;
 	}
 
-	public ConfigurationBuilder UseApiKey(string apiKey)
+	public ConfigurationBuilder UseDefaultLanguage(string language)
 	{
-		_apiKey = apiKey;
+		_configuration.DefaultLanguage = language;
 		return this;
 	}
 
-	public ConfigurationBuilder WithDefaultLanguage(string language)
+	public ConfigurationBuilder WithInputs(Action<IInputConfigurationBuilder> builder)
 	{
-		_defaultLanguage = language;
-		return WithLanguage(language);
+		builder(this);
+		return this;
 	}
 
-	public ConfigurationBuilder WithLanguage(string language)
+	public ConfigurationBuilder WithTypescriptOutputs(Action<IOutputConfigurationBuilder> builder)
 	{
-		_languages.Add(language);
+		_configuration.Output.Type = OutputType.Typescript;
+		builder(this);
+		return this;
+	}
+
+	IInputConfigurationBuilder IInputConfigurationBuilder.AddLanguage(string language)
+	{
+		_configuration.Input.Languages.Add(new()
+		{
+			LanguageCode = language,
+			SourceFile = $"sources/{language}.json"
+		});
+		return this;
+	}
+
+	IInputConfigurationBuilder IInputConfigurationBuilder.AddLanguage(string language, string sourceFile)
+	{
+		_configuration.Input.Languages.Add(new()
+		{
+			LanguageCode = language,
+			SourceFile = sourceFile
+		});
+		return this;
+	}
+
+	IOutputConfigurationBuilder IOutputConfigurationBuilder.AddOutput(string language)
+	{
+		_configuration.Output.Languages.Add(new()
+		{
+			LanguageCode = language,
+			OutputFile = $"{language}.{_configuration.Output.Type.FileExtension()}",
+			SourceFiles = new[] { $"sources/{language}.json" }
+		});
+		return this;
+	}
+
+
+	IOutputConfigurationBuilder IOutputConfigurationBuilder.AddOutput(string language, string outputFile, params string[] sourceFiles)
+	{
+		_configuration.Output.Languages.Add(new()
+		{
+			LanguageCode = language,
+			OutputFile = outputFile,
+			SourceFiles = sourceFiles
+		});
 		return this;
 	}
 
 	public void Build()
 	{
-		if (_host is null || _apiKey is null)
+		if (_configuration.Tolgee.Host is "" || _configuration.Tolgee.ApiKey is "")
 		{
 			throw new CakeException("Host and API key must be defined");
 		}
 
-		List<string> uploadTasks = new();
-		List<string> downloadTasks = new();
-
-		if (_defaultLanguage is not null)
+		if (_configuration.Input.Languages.Count == 0)
 		{
-			uploadTasks.Add("upload");
-			downloadTasks.Add("download");
-			_context.Task("upload").IsDependentOn($"upload-{_defaultLanguage}");
-			_context.Task("download").IsDependentOn($"download-{_defaultLanguage}");
+			throw new CakeException("At least one language must be defined");
 		}
 
-		foreach (string language in _languages)
+		if (_configuration.DefaultLanguage is "")
 		{
-			uploadTasks.Add($"upload-{language}");
-			downloadTasks.Add($"download-{language}");
-			Upload(language);
-			Download(language);
+			throw new CakeException("Default language must be defined");
 		}
 
-		if (_languages.Count > 0)
-		{
-			_context.Task($"upload-all").Does(async () =>
-			{
-				await new UploadTask(_host!, _apiKey!, _languages, _context.CakeContext.Log).Run();
-			});
-
-			_context.Task($"download-all").Does(async () =>
-			{
-				await new DownloadTask(_host!, _apiKey!, _languages, _context.CakeContext.Log).Run();
-			});
-
-			uploadTasks.Add("upload-all");
-			downloadTasks.Add("download-all");
-		}
-
-		_context.Task("help").Does(() =>
-		{
-			_context.CakeContext.Log.Information("");
-			_context.CakeContext.Log.Information("List of targets");
-			_context.CakeContext.Log.Information("");
-			if (uploadTasks.Count > 0)
-			{
-				_context.CakeContext.Log.Information("-- upload --");
-				_context.CakeContext.Log.Information("");
-				foreach (string task in uploadTasks)
-				{
-					_context.CakeContext.Log.Information($"\t{task}");
-				}
-				_context.CakeContext.Log.Information("");
-			}
-
-			if (downloadTasks.Count > 0)
-			{
-				_context.CakeContext.Log.Information("-- download --");
-				_context.CakeContext.Log.Information("");
-				foreach (string task in downloadTasks)
-				{
-					_context.CakeContext.Log.Information($"\t{task}");
-				}
-				_context.CakeContext.Log.Information("");
-			}
-			_context.CakeContext.Log.Information("help");
-		});
-		_context.Task("default").IsDependentOn("help").Does(() => { });
-	}
-
-	private void Upload(string language)
-	{
-		_context.Task($"upload-{language}").Does(async () =>
-		{
-			await new UploadTask(_host!, _apiKey!, new() { language }, _context.CakeContext.Log).Run();
-		});
-	}
-	private void Download(string language)
-	{
-		_context.Task($"download-{language}").Does(async () =>
-		{
-			await new DownloadTask(_host!, _apiKey!, new() { language }, _context.CakeContext.Log).Run();
-		});
+		new TaskMaker(_context, _configuration).Make();
 	}
 }

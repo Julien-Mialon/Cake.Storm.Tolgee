@@ -1,64 +1,60 @@
 ﻿using Cake.Core.Diagnostics;
+using Cake.Storm.Tolgee.Configurations;
 using Newtonsoft.Json;
 
 namespace Cake.Storm.Tolgee.Tasks;
 
-public abstract class TolgeeTask
+internal class TypescriptOutputTask : BaseTask
 {
-	protected string Host { get; }
-	protected string ApiKey { get; }
-	protected List<string> Languages { get; }
-	protected ICakeLog Log { get; }
+	private readonly string _defaultLanguage;
+	private readonly List<OutputLanguageConfiguration> _languages;
 
-	protected TolgeeTask(string host, string apiKey, List<string> languages, ICakeLog log)
+	public TypescriptOutputTask(ICakeLog log, List<OutputLanguageConfiguration> languages, string defaultLanguage) : base(log)
 	{
-		Host = host;
-		ApiKey = apiKey;
-		Languages = languages;
-		Log = log;
+		_languages = languages;
+		_defaultLanguage = defaultLanguage;
 	}
 
-	public virtual async Task Run()
+	public async Task Run()
 	{
-		UpdateTranslationFiles();
+		Log.Information("Generating typescript files");
+		await UpdateTranslationFiles();
 	}
 
-	private void UpdateTranslationFiles()
+	private async Task UpdateTranslationFiles()
 	{
-		Dictionary<string, string[]> files = new();
-		foreach (string lang in Languages)
+		Dictionary<string, Dictionary<string, string>> allTranslations = new();
+		foreach (OutputLanguageConfiguration languageConfiguration in _languages)
 		{
-			files.Add(lang, new[] { $"sources/{lang}.json" });
+			allTranslations.Add(languageConfiguration.LanguageCode, await LoadTranslationFiles(languageConfiguration.SourceFiles));
 		}
 
-		Dictionary<string, string> defaultTranslations = LoadTranslationFiles(files["en"]);
+		Dictionary<string, string> defaultTranslations = allTranslations[_defaultLanguage];
 		List<string> keys = defaultTranslations.Keys.OrderBy(x => x).ToList();
 
-		foreach (KeyValuePair<string, string[]> fileInfo in files)
+		foreach (OutputLanguageConfiguration languageConfiguration in _languages)
 		{
-			string lang = fileInfo.Key;
-			string[] langFiles = fileInfo.Value;
-			Dictionary<string, string> translations = LoadTranslationFiles(langFiles);
+			Dictionary<string, string> translations = allTranslations[languageConfiguration.LanguageCode];
 
-			string nl = System.Environment.NewLine;
+			string nl = Environment.NewLine;
 			List<string> lines = new();
-			if (lang == "en")
+			if (languageConfiguration.LanguageCode == _defaultLanguage)
 			{
-				lines.Add($"const {lang}Strings = {{");
+				lines.Add($"const {languageConfiguration.LanguageCode}Strings = {{");
 			}
 			else
 			{
 				lines.Add("import { RawStrings } from \"./types\";");
 				lines.Add("");
 				lines.Add("");
-				lines.Add($"const {lang}Strings: RawStrings = {{");
+				lines.Add($"const {languageConfiguration.LanguageCode}Strings: RawStrings = {{");
 			}
 
 			foreach (string key in keys)
 			{
 				string referenceTranslation = defaultTranslations[key];
 				string tr = translations.ContainsKey(key) && !string.IsNullOrEmpty(translations[key]) ? translations[key] : referenceTranslation;
-				if (AreTokenValid(key, lang, referenceTranslation, tr) == false)
+				if (AreTokenValid(key, languageConfiguration.LanguageCode, referenceTranslation, tr) == false)
 				{
 					tr = referenceTranslation;
 				}
@@ -72,11 +68,11 @@ public abstract class TolgeeTask
 
 			lines.Add("};");
 			lines.Add("");
-			lines.Add($"export default {lang}Strings;");
+			lines.Add($"export default {languageConfiguration.LanguageCode}Strings;");
 			lines.Add("");
 
 			string result = string.Join(nl, lines);
-			File.WriteAllText($"../{lang}.ts", result);
+			await File.WriteAllTextAsync($"../{languageConfiguration.LanguageCode}.ts", result);
 		}
 	}
 
@@ -136,12 +132,17 @@ public abstract class TolgeeTask
 		return false;
 	}
 
-	private Dictionary<string, string> LoadTranslationFiles(string[] files)
+	private async Task<Dictionary<string, string>> LoadTranslationFiles(string[] files)
 	{
 		Dictionary<string, string> result = new();
 		foreach (string file in files)
 		{
-			Dictionary<string, string> data = JsonConvert.DeserializeObject<Dictionary<string, string>>(System.IO.File.ReadAllText(file));
+			Dictionary<string, string>? data = JsonConvert.DeserializeObject<Dictionary<string, string>>(await File.ReadAllTextAsync(file));
+			if (data is null)
+			{
+				continue;
+			}
+
 			foreach (KeyValuePair<string, string> kvp in data)
 			{
 				result.Add(kvp.Key, kvp.Value);
