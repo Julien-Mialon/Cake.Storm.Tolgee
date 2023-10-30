@@ -73,11 +73,45 @@ public class ConfigurationBuilder : IInputConfigurationBuilder, IOutputConfigura
 
 	IOutputConfigurationBuilder IOutputConfigurationBuilder.AddOutput(string language, string outputFile, params string[] sourceFiles)
 	{
+		if (sourceFiles.Length == 0)
+		{
+			throw new CakeException($"No source files for output {language} / {outputFile}");
+		}
+
 		_configuration.Output.Languages.Add(new()
 		{
 			LanguageCode = language,
 			OutputFile = outputFile,
 			SourceFiles = sourceFiles
+		});
+		return this;
+	}
+
+	IOutputConfigurationBuilder IOutputConfigurationBuilder.AddPartialOutput(string language)
+	{
+		_configuration.Output.Languages.Add(new()
+		{
+			LanguageCode = language,
+			OutputFile = $"{language}.{_configuration.Output.Type.FileExtension()}",
+			SourceFiles = new[] { $"sources/{language}.json" },
+			IsPartial = true
+		});
+		return this;
+	}
+
+	IOutputConfigurationBuilder IOutputConfigurationBuilder.AddPartialOutput(string language, string outputFile, params string[] sourceFiles)
+	{
+		if (sourceFiles.Length == 0)
+		{
+			throw new CakeException($"No source files for partial output {language} / {outputFile}");
+		}
+
+		_configuration.Output.Languages.Add(new()
+		{
+			LanguageCode = language,
+			OutputFile = outputFile,
+			SourceFiles = sourceFiles,
+			IsPartial = true
 		});
 		return this;
 	}

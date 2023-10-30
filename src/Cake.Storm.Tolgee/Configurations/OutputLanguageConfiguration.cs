@@ -7,4 +7,6 @@ public class OutputLanguageConfiguration
 	public string OutputFile { get; set; } = "";
 
 	public string[] SourceFiles { get; init; } = Array.Empty<string>();
+
+	public bool IsPartial { get; set; }
 }

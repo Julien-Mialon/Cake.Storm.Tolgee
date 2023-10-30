@@ -30,7 +30,7 @@ internal class TypescriptOutputTask : BaseTask
 		}
 
 		Dictionary<string, string> defaultTranslations = allTranslations[_defaultLanguage];
-		List<string> keys = defaultTranslations.Keys.OrderBy(x => x).ToList();
+		List<string> keys = allTranslations.SelectMany(x => x.Value.Keys).Distinct().OrderBy(x => x).ToList();
 
 		foreach (OutputLanguageConfiguration languageConfiguration in _languages)
 		{
@@ -47,14 +47,34 @@ internal class TypescriptOutputTask : BaseTask
 				lines.Add("import { RawStrings } from \"./types\";");
 				lines.Add("");
 				lines.Add("");
-				lines.Add($"const {languageConfiguration.LanguageCode}Strings: RawStrings = {{");
+				if (languageConfiguration.IsPartial)
+				{
+					lines.Add($"const {languageConfiguration.LanguageCode}Strings: Partial<RawStrings> = {{");
+				}
+				else
+				{
+					lines.Add($"const {languageConfiguration.LanguageCode}Strings: RawStrings = {{");
+				}
 			}
 
 			foreach (string key in keys)
 			{
 				string referenceTranslation = defaultTranslations[key];
-				string tr = translations.ContainsKey(key) && !string.IsNullOrEmpty(translations[key]) ? translations[key] : referenceTranslation;
-				if (AreTokenValid(key, languageConfiguration.LanguageCode, referenceTranslation, tr) == false)
+				string tr = "";
+				if (translations.TryGetValue(key, out string? translation) && !string.IsNullOrEmpty(translation))
+				{
+					tr = translation;
+				}
+				else if (languageConfiguration.IsPartial)
+				{
+					continue;
+				}
+				else
+				{
+					tr = referenceTranslation;
+				}
+
+				if (AreTokenValid(key, languageConfiguration.LanguageCode, referenceTranslation, tr) is false)
 				{
 					tr = referenceTranslation;
 				}
@@ -128,6 +148,32 @@ internal class TypescriptOutputTask : BaseTask
 		Log.Warning($"Invalid tokens {language}: {key} => {string.Join(", ", invalidTokens.Select(x => $"{{{x}}}"))}");
 		Log.Information($"\tReference: {reference} (extractedTokens: #{string.Join("#, #", referenceTokensList)}#)");
 		Log.Information($"\tTranslation: {translation} (extractedTokens: #{string.Join("#, #", translationTokens)}#)");
+
+		if (translation.StartsWith(' ') && !reference.StartsWith(' '))
+		{
+			Log.Warning($"Missing leading space {language}: {key}");
+			Log.Information($"\t#{reference}#");
+			Log.Information($"\t#{translation}#");
+		}
+		else if (reference.StartsWith(' '))
+		{
+			Log.Warning($"Additional leading space {language}: {key}");
+			Log.Information($"\t#{reference}#");
+			Log.Information($"\t#{translation}#");
+		}
+
+		if (translation.EndsWith(' ') && !reference.EndsWith(' '))
+		{
+			Log.Warning($"Missing trailing space {language}: {key}");
+			Log.Information($"\t#{reference}#");
+			Log.Information($"\t#{translation}#");
+		}
+		else if (reference.EndsWith(' '))
+		{
+			Log.Warning($"Additional trailing space {language}: {key}");
+			Log.Information($"\t#{reference}#");
+			Log.Information($"\t#{translation}#");
+		}
 
 		return false;
 	}
