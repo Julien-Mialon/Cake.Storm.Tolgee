@@ -1,0 +1,104 @@
+variables:
+  PackageVersion: '1.0.0'
+
+resources:
+  repositories:
+    - repository: self
+      checkoutOptions:
+        clean: true
+        fetchDepth: 5
+        lfs: false
+        submodules: false
+
+trigger:
+  batch: true
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - src/*
+      - .devops/ci.yml
+
+name: "Cake-Tolgee-CI-$(SourceBranchName)-$(Date:yyyyMMdd)$(Rev:.r)"
+
+pool:
+  vmImage: windows-latest
+
+stages:
+- stage: build
+  displayName: 'Build solution'
+  jobs:
+    - job: build
+      steps:
+        - task: DotNetCoreCLI@2
+          inputs:
+            command: build
+            projects: 'cake-tolgee.sln'
+            custom: 'msbuild'
+            arguments: '-p:Configuration=Release'
+
+        - task: DotNetCoreCLI@2
+          inputs:
+            command: 'custom'
+            projects: 'src/Cake.Storm.Tolgee/Cake.Storm.Tolgee.csproj'
+            custom: 'msbuild'
+            arguments: '-p:Configuration=Release -p:PackageVersion=$(PackageVersion) -p:PackageOutputPath="$(build.artifactstagingdirectory)" -t:Pack'
+          condition: succeeded()
+
+        - task: PublishPipelineArtifact@1
+          displayName: 'Publish Artifact: drop'
+          inputs:
+            targetPath: $(build.ArtifactStagingDirectory)
+            artifact: 'drop'
+            publishLocation: 'pipeline'
+          condition: succeeded()
+
+- stage: deploy_baget
+  displayName: 'Deploy to Baget'
+  dependsOn: build
+  condition: succeeded()
+  jobs:
+    - job: deploy_baget
+      steps:
+        - task: DownloadPipelineArtifact@2
+          displayName: "Download build artifacts"
+          inputs:
+            buildType: 'current'
+            artifactName: 'drop'
+            targetPath: '$(Pipeline.Workspace)/drop'
+
+        - task: NuGetCommand@2
+          displayName: 'NuGet push'
+          inputs:
+            command: push
+            packagesToPush: '$(Pipeline.Workspace)/drop/*.nupkg;!$(Pipeline.Workspace)/drop/*.symbols.nupkg'
+            nuGetFeedType: external
+            publishFeedCredentials: $(BagetFeedCredentials)
+
+- stage: deploy_nuget
+  displayName: 'Deploy to NuGet'
+  dependsOn: deploy_baget
+  condition: succeeded()
+  jobs:
+    - deployment: deploy_nuget
+      displayName: 'Deploy to NuGet'
+      environment: 'Nuget'
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - task: DownloadPipelineArtifact@2
+                displayName: "Download build artifacts"
+                inputs:
+                  buildType: 'current'
+                  artifactName: 'drop'
+                  targetPath: '$(Pipeline.Workspace)/drop'
+
+              - task: NuGetCommand@2
+                displayName: 'NuGet push'
+                inputs:
+                  command: push
+                  packagesToPush: '$(Pipeline.Workspace)/drop/*.nupkg;$(Pipeline.Workspace)/drop/*.snupkg'
+                  nuGetFeedType: external
+                  publishFeedCredentials: $(NuGetFeedCredentials)
