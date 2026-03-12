@@ -3,7 +3,7 @@ using Cake.Storm.Tolgee.Configurations;
 
 namespace Cake.Storm.Tolgee;
 
-public class ConfigurationBuilder : IInputConfigurationBuilder, IOutputConfigurationBuilder
+public class ConfigurationBuilder : IInputConfigurationBuilder, IOutputConfigurationBuilder, IMergeConfigurationBuilder, IMergeOperationBuilder
 {
 	private readonly FluentContext _context;
 	private readonly Configuration _configuration = new();
@@ -39,6 +39,19 @@ public class ConfigurationBuilder : IInputConfigurationBuilder, IOutputConfigura
 		return this;
 	}
 
+	public ConfigurationBuilder WithJsonOutputs(Action<IOutputConfigurationBuilder> builder)
+	{
+		_configuration.Output.Type = OutputType.Json;
+		builder(this);
+		return this;
+	}
+
+	public ConfigurationBuilder WithMergeOperations(Action<IMergeConfigurationBuilder> builder)
+	{
+		builder(this);
+		return this;
+	}
+
 	IInputConfigurationBuilder IInputConfigurationBuilder.AddLanguage(string language)
 	{
 		_configuration.Input.Languages.Add(new()
@@ -69,7 +82,6 @@ public class ConfigurationBuilder : IInputConfigurationBuilder, IOutputConfigura
 		});
 		return this;
 	}
-
 
 	IOutputConfigurationBuilder IOutputConfigurationBuilder.AddOutput(string language, string outputFile, params string[] sourceFiles)
 	{
@@ -112,6 +124,24 @@ public class ConfigurationBuilder : IInputConfigurationBuilder, IOutputConfigura
 			OutputFile = outputFile,
 			SourceFiles = sourceFiles,
 			IsPartial = true
+		});
+		return this;
+	}
+
+	IMergeConfigurationBuilder IMergeConfigurationBuilder.AddOperation(Action<IMergeOperationBuilder> builder)
+	{
+		_configuration.Merge.Operations.Add(new());
+		builder(this);
+		return this;
+	}
+
+	IMergeOperationBuilder IMergeOperationBuilder.AddFile(string language, string outputFile, params string[] sourceFiles)
+	{
+		_configuration.Merge.Operations[^1].Files.Add(new()
+		{
+			LanguageCode = language,
+			OutputFile = outputFile,
+			SourceFiles = sourceFiles
 		});
 		return this;
 	}

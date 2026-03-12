@@ -9,4 +9,8 @@ public class Configuration
 	public InputConfiguration Input { get; } = new();
 
 	public OutputConfiguration Output { get; } = new();
+
+	public MergeFilesConfiguration Merge { get; } = new();
+
+	public bool Minify { get; set; } = false;
 }
