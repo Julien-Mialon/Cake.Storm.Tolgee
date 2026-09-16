@@ -26,25 +26,35 @@ internal class DownloadTask : BaseTask
 	private async Task DownloadTranslationFiles()
 	{
 		Log.Information("Download translation files");
-		List<(string lang, Dictionary<string, string> data)> langsData = await _client.DownloadTranslationFiles(_languages);
+		List<(string lang, Dictionary<string, string?> data)> langsData = await _client.DownloadTranslationFiles(_languages);
 		HashSet<string> keys = new(langsData.SelectMany(x => x.data.Keys));
 
 		foreach (string key in keys)
 		{
-			foreach ((string _, Dictionary<string, string> data) in langsData)
+			foreach ((string _, Dictionary<string, string?> data) in langsData)
 			{
-				data.TryAdd(key, string.Empty);
+				if (data.TryGetValue(key, out string? value))
+				{
+					if (value is null)
+					{
+						data[key] = string.Empty;
+					}
+				}
+				else
+				{
+					data.TryAdd(key, string.Empty);
+				}
 			}
 		}
 
-		foreach ((string lang, Dictionary<string, string> data) in langsData)
+		foreach ((string lang, Dictionary<string, string?> data) in langsData)
 		{
 			ShowCompletion(data, lang);
 			await File.WriteAllTextAsync(_languageConfigurations[lang].SourceFile, SerializeDictionary(data));
 		}
 	}
 
-	private void ShowCompletion(Dictionary<string, string> strings, string language)
+	private void ShowCompletion(Dictionary<string, string?> strings, string language)
 	{
 		int translatedCount = strings.Values.Count(x => !string.IsNullOrEmpty(x));
 		int total = strings.Count;
@@ -59,7 +69,7 @@ internal class DownloadTask : BaseTask
 		Log.Information($"{language}: {translatedCount}/{strings.Count} ({percentage}%){remaining}");
 	}
 
-	private string SerializeDictionary(Dictionary<string, string> source)
+	private string SerializeDictionary(Dictionary<string, string?> source)
 	{
 		JObject obj = new();
 
