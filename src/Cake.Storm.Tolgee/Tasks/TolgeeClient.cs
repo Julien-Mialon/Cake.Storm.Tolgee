@@ -1,4 +1,5 @@
 using System.Text;
+using Cake.Core;
 using Cake.Core.Diagnostics;
 using Cake.Storm.Tolgee.Configurations;
 using Newtonsoft.Json;
@@ -18,19 +19,7 @@ internal class TolgeeClient
 
 	public async Task<List<(string lang, Dictionary<string, string?> translations)>> DownloadTranslationFiles(params string[] languages)
 	{
-		HttpClient client = new();
-		HttpRequestMessage request = new(HttpMethod.Get, TranslationsUrl(languages));
-		request.Headers.TryAddWithoutValidation("X-API-Key", _configuration.ApiKey);
-
-		HttpResponseMessage response = await client.SendAsync(request);
-		string content = await response.Content.ReadAsStringAsync();
-
-		Dictionary<string, Dictionary<string, string?>>? remoteData = JsonConvert.DeserializeObject<Dictionary<string, Dictionary<string, string?>>>(content);
-
-		if (remoteData is null)
-		{
-			return languages.Select(x => (x, new Dictionary<string, string?>())).ToList();
-		}
+		Dictionary<string, Dictionary<string, string?>> remoteData = await FetchTranslations(languages);
 
 		List<(string lang, Dictionary<string, string?> data)> langsData = languages.Select(lang =>
 				(lang, remoteData.TryGetValue(lang, out Dictionary<string, string?>? dict) ? dict : new()))
@@ -41,7 +30,7 @@ internal class TolgeeClient
 
 	public async Task<bool> UploadFile(Dictionary<string, string> translations, string lang)
 	{
-		Dictionary<string, string> remoteTranslations = await DownloadOneLang(lang);
+		Dictionary<string, string?> remoteTranslations = await DownloadOneLang(lang);
 		List<string> keys = translations.Keys.OrderBy(x => x).ToList();
 
 		UploadRequest requestData = new()
@@ -78,22 +67,29 @@ internal class TolgeeClient
 		return false;
 	}
 
-	private async Task<Dictionary<string, string>> DownloadOneLang(string lang)
+	private async Task<Dictionary<string, string?>> DownloadOneLang(string lang)
+	{
+		Dictionary<string, Dictionary<string, string?>> remoteData = await FetchTranslations(lang);
+
+		return remoteData.TryGetValue(lang, out Dictionary<string, string?>? data) ? data : new();
+	}
+
+	private async Task<Dictionary<string, Dictionary<string, string?>>> FetchTranslations(params string[] languages)
 	{
 		HttpClient client = new();
-		HttpRequestMessage request = new(HttpMethod.Get, TranslationsUrl(lang));
+		HttpRequestMessage request = new(HttpMethod.Get, TranslationsUrl(languages));
 		request.Headers.TryAddWithoutValidation("X-API-Key", _configuration.ApiKey);
 
 		HttpResponseMessage response = await client.SendAsync(request);
 		string content = await response.Content.ReadAsStringAsync();
 
-		Dictionary<string, Dictionary<string, string>>? remoteData = JsonConvert.DeserializeObject<Dictionary<string, Dictionary<string, string>>>(content);
-		if (remoteData is null)
+		if (!response.IsSuccessStatusCode)
 		{
-			return new();
+			throw new CakeException($"Download of {string.Join(",", languages)} failed with status {(int)response.StatusCode}: {content}");
 		}
 
-		return remoteData.TryGetValue(lang, out Dictionary<string, string>? data) ? data : new();
+		return JsonConvert.DeserializeObject<Dictionary<string, Dictionary<string, string?>>>(content)
+			?? throw new CakeException($"Download of {string.Join(",", languages)} returned an empty response");
 	}
 
 	private string ProjectUrl => _configuration.ProjectId is { } projectId
