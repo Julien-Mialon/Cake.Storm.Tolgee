@@ -1,4 +1,5 @@
-﻿using Cake.Core.Diagnostics;
+﻿using System.Text.RegularExpressions;
+using Cake.Core.Diagnostics;
 using Cake.Storm.Tolgee.Configurations;
 
 namespace Cake.Storm.Tolgee.Tasks;
@@ -82,7 +83,7 @@ internal class TypescriptOutputTask : BaseOutputTask
 					.Replace("\"", "\\\"")
 					.Replace("\t", "\\t")
 					.Replace("\n", "\\n");
-				lines.Add($"\t{key}: \"{tr}\",");
+				lines.Add($"\t{PropertyName(key)}: \"{tr}\",");
 			}
 
 			lines.Add("};");
@@ -93,5 +94,10 @@ internal class TypescriptOutputTask : BaseOutputTask
 			string result = string.Join(nl, lines);
 			await File.WriteAllTextAsync(languageConfiguration.OutputFile, result);
 		}
+	}
+
+	private static string PropertyName(string key)
+	{
+		return Regex.IsMatch(key, @"^[A-Za-z_$][A-Za-z0-9_$]*$") ? key : $"\"{key}\"";
 	}
 }

@@ -98,7 +98,8 @@ internal class TolgeeClient
 
 	private string TranslationsUrl(params string[] languages)
 	{
-		return $"{ProjectUrl}/translations/{string.Join(",", languages)}?ns={Uri.EscapeDataString(_configuration.Namespace ?? "")}";
+		// An empty structureDelimiter stops Tolgee from nesting keys on dots
+		return $"{ProjectUrl}/translations/{string.Join(",", languages)}?ns={Uri.EscapeDataString(_configuration.Namespace ?? "")}&structureDelimiter=";
 	}
 
 	private class UploadRequest
