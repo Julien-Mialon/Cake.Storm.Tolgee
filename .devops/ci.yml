@@ -73,13 +73,12 @@ stages:
           displayName: "Download build artifacts"
           artifact: drop
 
-        - task: NuGetCommand@2
+        # Stay relative: on Windows, a wildcard path containing / fails with "file does not exist".
+        - pwsh: dotnet nuget push *.nupkg --source https://nuget.magicbot.fr/v3/index.json --api-key "$env:NUGET_API_KEY" --skip-duplicate
           displayName: 'NuGet push'
-          inputs:
-            command: push
-            packagesToPush: '$(Pipeline.Workspace)/drop/*.nupkg;!$(Pipeline.Workspace)/drop/*.symbols.nupkg'
-            nuGetFeedType: external
-            publishFeedCredentials: nuget.internal
+          workingDirectory: $(Pipeline.Workspace)/drop
+          env:
+            NUGET_API_KEY: $(BagetApiKey)
 
 - stage: deploy_nuget
   displayName: 'Deploy to NuGet'
@@ -93,10 +92,8 @@ stages:
         runOnce:
           deploy:
             steps:
-              - task: NuGetCommand@2
+              - pwsh: dotnet nuget push *.nupkg --source https://api.nuget.org/v3/index.json --api-key "$env:NUGET_API_KEY" --skip-duplicate
                 displayName: 'NuGet push'
-                inputs:
-                  command: push
-                  packagesToPush: '$(Pipeline.Workspace)/drop/*.nupkg;!$(Pipeline.Workspace)/drop/*.symbols.nupkg'
-                  nuGetFeedType: external
-                  publishFeedCredentials: nuget.org
+                workingDirectory: $(Pipeline.Workspace)/drop
+                env:
+                  NUGET_API_KEY: $(NuGetApiKey)
