@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 		<LangVersion>latest</LangVersion>
@@ -38,17 +38,29 @@
 	
 	<!-- scripts embedding -->
 	<ItemGroup>
-		<Content Include="scripts/*.cake">
-			<Pack>true</Pack>
-			<PackagePath>scripts</PackagePath>
-		</Content>
+		<Content Include="scripts/*.cake" Pack="false" />
 	</ItemGroup>
 
+	<PropertyGroup>
+		<TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PackVersionedScript</TargetsForTfmSpecificContentInPackage>
+	</PropertyGroup>
+
+	<!-- An unversioned #addin floats to the latest release, whatever version consumers #load. -->
+	<Target Name="PackVersionedScript">
+		<PropertyGroup>
+			<VersionedScriptPath>$(IntermediateOutputPath)Cake.Storm.Tolgee.cake</VersionedScriptPath>
+			<VersionedScriptContent>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)/scripts/Cake.Storm.Tolgee.cake').Replace('$version$', '$(PackageVersion)'))</VersionedScriptContent>
+		</PropertyGroup>
+		<WriteLinesToFile File="$(VersionedScriptPath)" Lines="$([MSBuild]::Escape($(VersionedScriptContent)))" Overwrite="true" />
+		<ItemGroup>
+			<TfmSpecificPackageFile Include="$(VersionedScriptPath)" PackagePath="scripts" />
+		</ItemGroup>
+	</Target>
+
   <ItemGroup>
-		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="All" />
-    <PackageReference Include="Cake.Common" Version="3.1.0" />
-    <PackageReference Include="Cake.Core" Version="3.1.0" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Cake.Common" Version="6.0.0" PrivateAssets="All" />
+    <PackageReference Include="Cake.Core" Version="6.0.0" PrivateAssets="All" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
 
 </Project>

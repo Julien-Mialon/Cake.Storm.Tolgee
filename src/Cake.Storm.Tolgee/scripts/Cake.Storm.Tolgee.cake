@@ -1,4 +1,4 @@
-#addin Cake.Storm.Tolgee
+#addin nuget:?package=Cake.Storm.Tolgee&version=$version$
 
 public ConfigurationBuilder ConfigureTolgee()
 {

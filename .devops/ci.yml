@@ -1,14 +1,5 @@
 variables:
-  PackageVersion: '1.2.0'
-
-resources:
-  repositories:
-    - repository: self
-      checkoutOptions:
-        clean: true
-        fetchDepth: 5
-        lfs: false
-        submodules: false
+  PackageVersion: '2.0.1'
 
 trigger:
   batch: true
@@ -18,6 +9,15 @@ trigger:
   paths:
     include:
       - src/*
+      - .devops/ci.yml
+
+pr:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - src
       - .devops/ci.yml
 
 name: "Cake-Tolgee-CI-$(SourceBranchName)-$(Date:yyyyMMdd)$(Rev:.r)"
@@ -31,11 +31,19 @@ stages:
   jobs:
     - job: build
       steps:
+        - checkout: self
+          fetchDepth: 5
+
+        - task: UseDotNet@2
+          displayName: 'Install .NET 10 SDK'
+          inputs:
+            packageType: sdk
+            version: '10.x'
+
         - task: DotNetCoreCLI@2
           inputs:
             command: build
             projects: 'cake-tolgee.sln'
-            custom: 'msbuild'
             arguments: '-p:Configuration=Release'
 
         - task: DotNetCoreCLI@2
@@ -44,7 +52,6 @@ stages:
             projects: 'src/Cake.Storm.Tolgee/Cake.Storm.Tolgee.csproj'
             custom: 'msbuild'
             arguments: '-p:Configuration=Release -p:PackageVersion=$(PackageVersion) -p:PackageOutputPath="$(build.artifactstagingdirectory)" -t:Pack'
-          condition: succeeded()
 
         - task: PublishPipelineArtifact@1
           displayName: 'Publish Artifact: drop'
@@ -52,36 +59,35 @@ stages:
             targetPath: $(build.ArtifactStagingDirectory)
             artifact: 'drop'
             publishLocation: 'pipeline'
-          condition: succeeded()
 
 - stage: deploy_baget
   displayName: 'Deploy to Baget'
   dependsOn: build
-  condition: succeeded()
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  variables:
+    - group: nuget and baget
   jobs:
     - job: deploy_baget
       steps:
         - checkout: none
 
-        - task: DownloadPipelineArtifact@2
+        - download: current
           displayName: "Download build artifacts"
-          inputs:
-            buildType: 'current'
-            artifactName: 'drop'
-            targetPath: '$(Pipeline.Workspace)/drop'
+          artifact: drop
 
-        - task: NuGetCommand@2
+        # Stay relative: on Windows, a wildcard path containing / fails with "file does not exist".
+        - pwsh: dotnet nuget push *.nupkg --source https://nuget.magicbot.fr/v3/index.json --api-key "$env:NUGET_API_KEY" --skip-duplicate
           displayName: 'NuGet push'
-          inputs:
-            command: push
-            packagesToPush: '$(Pipeline.Workspace)/drop/*.nupkg;!$(Pipeline.Workspace)/drop/*.symbols.nupkg'
-            nuGetFeedType: external
-            publishFeedCredentials: nuget.internal
+          workingDirectory: $(Pipeline.Workspace)/drop
+          env:
+            NUGET_API_KEY: $(BagetApiKey)
 
 - stage: deploy_nuget
   displayName: 'Deploy to NuGet'
   dependsOn: deploy_baget
-  condition: succeeded()
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  variables:
+    - group: nuget and baget
   jobs:
     - deployment: deploy_nuget
       displayName: 'Deploy to NuGet'
@@ -90,19 +96,8 @@ stages:
         runOnce:
           deploy:
             steps:
-              - checkout: none
-
-              - task: DownloadPipelineArtifact@2
-                displayName: "Download build artifacts"
-                inputs:
-                  buildType: 'current'
-                  artifactName: 'drop'
-                  targetPath: '$(Pipeline.Workspace)/drop'
-
-              - task: NuGetCommand@2
+              - pwsh: dotnet nuget push *.nupkg --source https://api.nuget.org/v3/index.json --api-key "$env:NUGET_API_KEY" --skip-duplicate
                 displayName: 'NuGet push'
-                inputs:
-                  command: push
-                  packagesToPush: '$(Pipeline.Workspace)/drop/*.nupkg;!$(Pipeline.Workspace)/drop/*.symbols.nupkg'
-                  nuGetFeedType: external
-                  publishFeedCredentials: nuget.org
+                workingDirectory: $(Pipeline.Workspace)/drop
+                env:
+                  NUGET_API_KEY: $(NuGetApiKey)
