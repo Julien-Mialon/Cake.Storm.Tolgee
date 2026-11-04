@@ -41,7 +41,8 @@ internal class TolgeeClient
 					[lang] = new()
 					{
 						Text = translations[key],
-						Resolution = remoteTranslations.ContainsKey(key) ? "OVERRIDE" : "NEW",
+						// Tolgee rejects OVERRIDE unless the existing translation is non-empty
+						Resolution = string.IsNullOrEmpty(remoteTranslations.GetValueOrDefault(key)) ? "NEW" : "OVERRIDE",
 					},
 				}
 			}).ToList()
