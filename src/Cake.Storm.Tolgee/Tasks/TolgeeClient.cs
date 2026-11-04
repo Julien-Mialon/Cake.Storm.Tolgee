@@ -1,6 +1,5 @@
 using System.Text;
 using Cake.Core;
-using Cake.Core.Diagnostics;
 using Cake.Storm.Tolgee.Configurations;
 using Newtonsoft.Json;
 
@@ -9,12 +8,10 @@ namespace Cake.Storm.Tolgee.Tasks;
 internal class TolgeeClient
 {
 	private readonly TolgeeConfiguration _configuration;
-	private readonly ICakeLog _log;
 
-	public TolgeeClient(TolgeeConfiguration configuration, ICakeLog log)
+	public TolgeeClient(TolgeeConfiguration configuration)
 	{
 		_configuration = configuration;
-		_log = log;
 	}
 
 	public async Task<List<(string lang, Dictionary<string, string?> translations)>> DownloadTranslationFiles(params string[] languages)
@@ -28,7 +25,7 @@ internal class TolgeeClient
 		return langsData;
 	}
 
-	public async Task<bool> UploadFile(Dictionary<string, string> translations, string lang)
+	public async Task UploadFile(Dictionary<string, string> translations, string lang)
 	{
 		Dictionary<string, string?> remoteTranslations = await DownloadOneLang(lang);
 		List<string> keys = translations.Keys.OrderBy(x => x).ToList();
@@ -57,14 +54,10 @@ internal class TolgeeClient
 		request.Content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
 		HttpResponseMessage response = await client.SendAsync(request);
-		if (response.IsSuccessStatusCode)
+		if (!response.IsSuccessStatusCode)
 		{
-			return true;
+			throw new CakeException($"Upload of {lang} failed with status {(int)response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
 		}
-
-		_log.Warning("Upload error");
-		_log.Warning(await response.Content.ReadAsStringAsync());
-		return false;
 	}
 
 	private async Task<Dictionary<string, string?>> DownloadOneLang(string lang)
