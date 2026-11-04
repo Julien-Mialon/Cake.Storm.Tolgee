@@ -28,7 +28,8 @@ internal class TolgeeClient
 	public async Task UploadFile(Dictionary<string, string> translations, string lang)
 	{
 		Dictionary<string, string?> remoteTranslations = await DownloadOneLang(lang);
-		List<string> keys = translations.Keys.OrderBy(x => x).ToList();
+		// Downloads write "" for untranslated keys, which must not blank newer remote translations
+		List<string> keys = translations.Where(x => !string.IsNullOrEmpty(x.Value)).Select(x => x.Key).OrderBy(x => x).ToList();
 
 		UploadRequest requestData = new()
 		{
