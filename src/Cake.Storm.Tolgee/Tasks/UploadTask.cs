@@ -28,10 +28,8 @@ internal class UploadTask : BaseTask
 			}
 
 			Log.Information($"Upload {language.LanguageCode} translation file");
-			if (await _client.UploadFile(defaultTranslations, language.LanguageCode))
-			{
-				Log.Information("\tUploaded with success");
-			}
+			await _client.UploadFile(defaultTranslations, language.LanguageCode);
+			Log.Information("\tUploaded with success");
 		}
 	}
 }

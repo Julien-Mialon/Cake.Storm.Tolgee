@@ -1,5 +1,5 @@
 using System.Text;
-using Cake.Core.Diagnostics;
+using Cake.Core;
 using Cake.Storm.Tolgee.Configurations;
 using Newtonsoft.Json;
 
@@ -8,29 +8,15 @@ namespace Cake.Storm.Tolgee.Tasks;
 internal class TolgeeClient
 {
 	private readonly TolgeeConfiguration _configuration;
-	private readonly ICakeLog _log;
 
-	public TolgeeClient(TolgeeConfiguration configuration, ICakeLog log)
+	public TolgeeClient(TolgeeConfiguration configuration)
 	{
 		_configuration = configuration;
-		_log = log;
 	}
 
 	public async Task<List<(string lang, Dictionary<string, string?> translations)>> DownloadTranslationFiles(params string[] languages)
 	{
-		HttpClient client = new();
-		HttpRequestMessage request = new(HttpMethod.Get, $"{_configuration.Host}/v2/projects/translations/{string.Join(",", languages)}?ns=string");
-		request.Headers.TryAddWithoutValidation("X-API-Key", _configuration.ApiKey);
-
-		HttpResponseMessage response = await client.SendAsync(request);
-		string content = await response.Content.ReadAsStringAsync();
-
-		Dictionary<string, Dictionary<string, string?>>? remoteData = JsonConvert.DeserializeObject<Dictionary<string, Dictionary<string, string?>>>(content);
-
-		if (remoteData is null)
-		{
-			return languages.Select(x => (x, new Dictionary<string, string?>())).ToList();
-		}
+		Dictionary<string, Dictionary<string, string?>> remoteData = await FetchTranslations(languages);
 
 		List<(string lang, Dictionary<string, string?> data)> langsData = languages.Select(lang =>
 				(lang, remoteData.TryGetValue(lang, out Dictionary<string, string?>? dict) ? dict : new()))
@@ -39,60 +25,76 @@ internal class TolgeeClient
 		return langsData;
 	}
 
-	public async Task<bool> UploadFile(Dictionary<string, string> translations, string lang)
+	public async Task UploadFile(Dictionary<string, string> translations, string lang)
 	{
-		Dictionary<string, string> remoteTranslations = await DownloadOneLang(lang);
-		List<string> keys = translations.Keys.OrderBy(x => x).ToList();
+		Dictionary<string, string?> remoteTranslations = await DownloadOneLang(lang);
+		// Downloads write "" for untranslated keys, which must not blank newer remote translations
+		List<string> keys = translations.Where(x => !string.IsNullOrEmpty(x.Value)).Select(x => x.Key).OrderBy(x => x).ToList();
 
 		UploadRequest requestData = new()
 		{
 			Keys = keys.Select(key => new UploadRequest.UploadKeyRequest()
 			{
 				Name = key,
+				Namespace = _configuration.Namespace,
 				Translations = new()
 				{
 					[lang] = new()
 					{
 						Text = translations[key],
-						Resolution = remoteTranslations.ContainsKey(key) ? "OVERRIDE" : "NEW",
+						// Tolgee rejects OVERRIDE unless the existing translation is non-empty
+						Resolution = string.IsNullOrEmpty(remoteTranslations.GetValueOrDefault(key)) ? "NEW" : "OVERRIDE",
 					},
 				}
 			}).ToList()
 		};
 
 		HttpClient client = new();
-		HttpRequestMessage request = new(HttpMethod.Post, $"{_configuration.Host}/v2/projects/keys/import-resolvable");
+		HttpRequestMessage request = new(HttpMethod.Post, $"{ProjectUrl}/keys/import-resolvable");
 		request.Headers.TryAddWithoutValidation("X-API-Key", _configuration.ApiKey);
 		string jsonContent = JsonConvert.SerializeObject(requestData);
 		request.Content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
 		HttpResponseMessage response = await client.SendAsync(request);
-		if (response.IsSuccessStatusCode)
+		if (!response.IsSuccessStatusCode)
 		{
-			return true;
+			throw new CakeException($"Upload of {lang} failed with status {(int)response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
 		}
-
-		_log.Warning("Upload error");
-		_log.Warning(await response.Content.ReadAsStringAsync());
-		return false;
 	}
 
-	private async Task<Dictionary<string, string>> DownloadOneLang(string lang)
+	private async Task<Dictionary<string, string?>> DownloadOneLang(string lang)
+	{
+		Dictionary<string, Dictionary<string, string?>> remoteData = await FetchTranslations(lang);
+
+		return remoteData.TryGetValue(lang, out Dictionary<string, string?>? data) ? data : new();
+	}
+
+	private async Task<Dictionary<string, Dictionary<string, string?>>> FetchTranslations(params string[] languages)
 	{
 		HttpClient client = new();
-		HttpRequestMessage request = new(HttpMethod.Get, $"{_configuration.Host}/v2/projects/translations/{lang}?ns=string");
+		HttpRequestMessage request = new(HttpMethod.Get, TranslationsUrl(languages));
 		request.Headers.TryAddWithoutValidation("X-API-Key", _configuration.ApiKey);
 
 		HttpResponseMessage response = await client.SendAsync(request);
 		string content = await response.Content.ReadAsStringAsync();
 
-		Dictionary<string, Dictionary<string, string>>? remoteData = JsonConvert.DeserializeObject<Dictionary<string, Dictionary<string, string>>>(content);
-		if (remoteData is null)
+		if (!response.IsSuccessStatusCode)
 		{
-			return new();
+			throw new CakeException($"Download of {string.Join(",", languages)} failed with status {(int)response.StatusCode}: {content}");
 		}
 
-		return remoteData.TryGetValue(lang, out Dictionary<string, string>? data) ? data : new();
+		return JsonConvert.DeserializeObject<Dictionary<string, Dictionary<string, string?>>>(content)
+			?? throw new CakeException($"Download of {string.Join(",", languages)} returned an empty response");
+	}
+
+	private string ProjectUrl => _configuration.ProjectId is { } projectId
+		? $"{_configuration.Host}/v2/projects/{projectId}"
+		: $"{_configuration.Host}/v2/projects";
+
+	private string TranslationsUrl(params string[] languages)
+	{
+		// An empty structureDelimiter stops Tolgee from nesting keys on dots
+		return $"{ProjectUrl}/translations/{string.Join(",", languages)}?ns={Uri.EscapeDataString(_configuration.Namespace ?? "")}&structureDelimiter=";
 	}
 
 	private class UploadRequest
@@ -106,7 +108,7 @@ internal class TolgeeClient
 			public string Name { get; set; } = "";
 
 			[JsonProperty("namespace")]
-			public string Namespace { get; set; } = "string";
+			public string? Namespace { get; set; }
 
 			[JsonProperty("translations")]
 			public Dictionary<string, UploadTranslationRequest> Translations { get; set; } = new();

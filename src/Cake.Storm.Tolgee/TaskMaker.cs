@@ -16,7 +16,7 @@ internal class TaskMaker
 	{
 		_context = context;
 		_configuration = configuration;
-		_client = new(_configuration.Tolgee, _context.CakeContext.Log);
+		_client = new(_configuration.Tolgee);
 	}
 
 	public void Make()

@@ -29,6 +29,12 @@ internal class DownloadTask : BaseTask
 		List<(string lang, Dictionary<string, string?> data)> langsData = await _client.DownloadTranslationFiles(_languages);
 		HashSet<string> keys = new(langsData.SelectMany(x => x.data.Keys));
 
+		if (keys.Count == 0)
+		{
+			Log.Warning($"No translations found for {string.Join(", ", _languages)}, local files left untouched");
+			return;
+		}
+
 		foreach (string key in keys)
 		{
 			foreach ((string _, Dictionary<string, string?> data) in langsData)
