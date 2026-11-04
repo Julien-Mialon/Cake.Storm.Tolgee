@@ -38,11 +38,24 @@
 	
 	<!-- scripts embedding -->
 	<ItemGroup>
-		<Content Include="scripts/*.cake">
-			<Pack>true</Pack>
-			<PackagePath>scripts</PackagePath>
-		</Content>
+		<Content Include="scripts/*.cake" Pack="false" />
 	</ItemGroup>
+
+	<PropertyGroup>
+		<TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PackVersionedScript</TargetsForTfmSpecificContentInPackage>
+	</PropertyGroup>
+
+	<!-- An unversioned #addin floats to the latest release, whatever version consumers #load. -->
+	<Target Name="PackVersionedScript">
+		<PropertyGroup>
+			<VersionedScriptPath>$(IntermediateOutputPath)Cake.Storm.Tolgee.cake</VersionedScriptPath>
+			<VersionedScriptContent>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)/scripts/Cake.Storm.Tolgee.cake').Replace('$version$', '$(PackageVersion)'))</VersionedScriptContent>
+		</PropertyGroup>
+		<WriteLinesToFile File="$(VersionedScriptPath)" Lines="$([MSBuild]::Escape($(VersionedScriptContent)))" Overwrite="true" />
+		<ItemGroup>
+			<TfmSpecificPackageFile Include="$(VersionedScriptPath)" PackagePath="scripts" />
+		</ItemGroup>
+	</Target>
 
   <ItemGroup>
 		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="All" />
