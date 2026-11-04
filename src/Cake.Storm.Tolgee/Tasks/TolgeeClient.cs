@@ -19,7 +19,7 @@ internal class TolgeeClient
 	public async Task<List<(string lang, Dictionary<string, string?> translations)>> DownloadTranslationFiles(params string[] languages)
 	{
 		HttpClient client = new();
-		HttpRequestMessage request = new(HttpMethod.Get, $"{_configuration.Host}/v2/projects/translations/{string.Join(",", languages)}?ns=string");
+		HttpRequestMessage request = new(HttpMethod.Get, TranslationsUrl(languages));
 		request.Headers.TryAddWithoutValidation("X-API-Key", _configuration.ApiKey);
 
 		HttpResponseMessage response = await client.SendAsync(request);
@@ -49,6 +49,7 @@ internal class TolgeeClient
 			Keys = keys.Select(key => new UploadRequest.UploadKeyRequest()
 			{
 				Name = key,
+				Namespace = _configuration.Namespace,
 				Translations = new()
 				{
 					[lang] = new()
@@ -61,7 +62,7 @@ internal class TolgeeClient
 		};
 
 		HttpClient client = new();
-		HttpRequestMessage request = new(HttpMethod.Post, $"{_configuration.Host}/v2/projects/keys/import-resolvable");
+		HttpRequestMessage request = new(HttpMethod.Post, $"{ProjectUrl}/keys/import-resolvable");
 		request.Headers.TryAddWithoutValidation("X-API-Key", _configuration.ApiKey);
 		string jsonContent = JsonConvert.SerializeObject(requestData);
 		request.Content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
@@ -80,7 +81,7 @@ internal class TolgeeClient
 	private async Task<Dictionary<string, string>> DownloadOneLang(string lang)
 	{
 		HttpClient client = new();
-		HttpRequestMessage request = new(HttpMethod.Get, $"{_configuration.Host}/v2/projects/translations/{lang}?ns=string");
+		HttpRequestMessage request = new(HttpMethod.Get, TranslationsUrl(lang));
 		request.Headers.TryAddWithoutValidation("X-API-Key", _configuration.ApiKey);
 
 		HttpResponseMessage response = await client.SendAsync(request);
@@ -95,6 +96,15 @@ internal class TolgeeClient
 		return remoteData.TryGetValue(lang, out Dictionary<string, string>? data) ? data : new();
 	}
 
+	private string ProjectUrl => _configuration.ProjectId is { } projectId
+		? $"{_configuration.Host}/v2/projects/{projectId}"
+		: $"{_configuration.Host}/v2/projects";
+
+	private string TranslationsUrl(params string[] languages)
+	{
+		return $"{ProjectUrl}/translations/{string.Join(",", languages)}?ns={Uri.EscapeDataString(_configuration.Namespace ?? "")}";
+	}
+
 	private class UploadRequest
 	{
 		[JsonProperty("keys")]
@@ -106,7 +116,7 @@ internal class TolgeeClient
 			public string Name { get; set; } = "";
 
 			[JsonProperty("namespace")]
-			public string Namespace { get; set; } = "string";
+			public string? Namespace { get; set; }
 
 			[JsonProperty("translations")]
 			public Dictionary<string, UploadTranslationRequest> Translations { get; set; } = new();

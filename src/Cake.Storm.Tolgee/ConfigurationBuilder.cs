@@ -20,6 +20,19 @@ public class ConfigurationBuilder : IInputConfigurationBuilder, IOutputConfigura
 		return this;
 	}
 
+	public ConfigurationBuilder UseProjectId(long projectId)
+	{
+		_configuration.Tolgee.ProjectId = projectId;
+		return this;
+	}
+
+	public ConfigurationBuilder UseNamespace(string name)
+	{
+		// Tolgee's key import does not treat "" as the default namespace, only null
+		_configuration.Tolgee.Namespace = name is "" ? null : name;
+		return this;
+	}
+
 	public ConfigurationBuilder UseDefaultLanguage(string language)
 	{
 		_configuration.DefaultLanguage = language;
@@ -151,6 +164,11 @@ public class ConfigurationBuilder : IInputConfigurationBuilder, IOutputConfigura
 		if (_configuration.Tolgee.Host is "" || _configuration.Tolgee.ApiKey is "")
 		{
 			throw new CakeException("Host and API key must be defined");
+		}
+
+		if (_configuration.Tolgee.ApiKey.StartsWith("tgpat_", StringComparison.Ordinal) && _configuration.Tolgee.ProjectId is null)
+		{
+			throw new CakeException("Project id must be defined when using a personal access token");
 		}
 
 		if (_configuration.Input.Languages.Count == 0)
