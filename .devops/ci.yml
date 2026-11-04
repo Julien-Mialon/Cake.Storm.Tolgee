@@ -1,15 +1,6 @@
 variables:
   PackageVersion: '2.0.1'
 
-resources:
-  repositories:
-    - repository: self
-      checkoutOptions:
-        clean: true
-        fetchDepth: 5
-        lfs: false
-        submodules: false
-
 trigger:
   batch: true
   branches:
@@ -31,6 +22,9 @@ stages:
   jobs:
     - job: build
       steps:
+        - checkout: self
+          fetchDepth: 5
+
         - task: UseDotNet@2
           displayName: 'Install .NET 10 SDK'
           inputs:
