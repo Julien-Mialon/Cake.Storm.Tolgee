@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 		<LangVersion>latest</LangVersion>
@@ -46,8 +46,8 @@
 
   <ItemGroup>
 		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="All" />
-    <PackageReference Include="Cake.Common" Version="3.1.0" />
-    <PackageReference Include="Cake.Core" Version="3.1.0" />
+    <PackageReference Include="Cake.Common" Version="6.0.0" PrivateAssets="All" />
+    <PackageReference Include="Cake.Core" Version="6.0.0" PrivateAssets="All" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
