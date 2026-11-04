@@ -1,5 +1,5 @@
 variables:
-  PackageVersion: '2.0.1'
+  PackageVersion: '2.0.2'
 
 trigger:
   batch: true
