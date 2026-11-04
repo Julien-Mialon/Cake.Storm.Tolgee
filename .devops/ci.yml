@@ -64,6 +64,8 @@ stages:
   displayName: 'Deploy to Baget'
   dependsOn: build
   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  variables:
+    - group: nuget and baget
   jobs:
     - job: deploy_baget
       steps:
@@ -84,6 +86,8 @@ stages:
   displayName: 'Deploy to NuGet'
   dependsOn: deploy_baget
   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  variables:
+    - group: nuget and baget
   jobs:
     - deployment: deploy_nuget
       displayName: 'Deploy to NuGet'
