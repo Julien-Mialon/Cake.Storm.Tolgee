@@ -41,7 +41,6 @@ stages:
           inputs:
             command: build
             projects: 'cake-tolgee.sln'
-            custom: 'msbuild'
             arguments: '-p:Configuration=Release'
 
         - task: DotNetCoreCLI@2
@@ -50,7 +49,6 @@ stages:
             projects: 'src/Cake.Storm.Tolgee/Cake.Storm.Tolgee.csproj'
             custom: 'msbuild'
             arguments: '-p:Configuration=Release -p:PackageVersion=$(PackageVersion) -p:PackageOutputPath="$(build.artifactstagingdirectory)" -t:Pack'
-          condition: succeeded()
 
         - task: PublishPipelineArtifact@1
           displayName: 'Publish Artifact: drop'
@@ -58,7 +56,6 @@ stages:
             targetPath: $(build.ArtifactStagingDirectory)
             artifact: 'drop'
             publishLocation: 'pipeline'
-          condition: succeeded()
 
 - stage: deploy_baget
   displayName: 'Deploy to Baget'
